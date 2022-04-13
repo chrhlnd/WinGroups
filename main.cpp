@@ -23,6 +23,7 @@ using namespace std;
 enum class Cmd
 {
 	MoveAway = 1,
+	MoveAllAway,
 	MoveBack,
 	MoveSwap,
 	RestoreTo,
@@ -439,12 +440,22 @@ void MoveToCurrent(HWND hWin)
 	if (!SUCCEEDED(pDesktopManagerInternal->MoveViewToDesktop(app, current))) return;
 }
 
-void MoveBackFromScratch()
+void MoveBackFromOther()
 {
 	if (m_Moved.empty())
 		return;
 	MoveToCurrent(*m_Moved.end() - 1);
 	m_Moved.erase(m_Moved.end() - 1);
+}
+
+void MoveAllToOther()
+{
+	std::vector<HWND> list;
+	EnumWindows(EnumCurrent, (LPARAM)&list);
+	for (const auto& win : list)
+	{
+		MoveToScratch(win, FALSE);
+	}
 }
 
 void MoveToScratch(HWND hWin, BOOL track)
@@ -629,6 +640,72 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+void SwitchToAnchorDesktop()
+{
+	GUID anchorDesk = { 0 };
+
+	if (FAILED(pDesktopManager->GetWindowDesktopId(m_hWnd, &anchorDesk)))
+		return;
+
+	IVirtualDesktop* pCur = nullptr;
+	GUID id = { 0 };
+	if (FAILED(pDesktopManagerInternal->GetCurrentDesktop(&pCur)))
+		return;
+	if (FAILED(pCur->GetID(&id)))
+		return;
+
+	if (anchorDesk == id)
+		return;
+
+	IObjectArray* pObjectArray = nullptr;
+	if (FAILED(pDesktopManagerInternal->GetDesktops(&pObjectArray))) return;
+	UINT count = 0;
+	if (FAILED(pObjectArray->GetCount(&count))) return;
+
+	std::vector<IVirtualDesktop*> desktops;
+
+	for (UINT i = 0; i < count; i++)
+	{
+		if (FAILED(pObjectArray->GetAt(i, __uuidof(IVirtualDesktop), (void**)&pCur)))
+			continue;
+		if (FAILED(pCur->GetID(&id)))
+			continue;
+
+		if (anchorDesk == id)
+		{
+			pDesktopManagerInternal->SwitchDesktop(pCur);
+			break;
+		}
+	}
+}
+
+void BindHotKeys()
+{
+	UnregisterHotKey(NULL, (UINT)Cmd::MoveAllAway);
+	UnregisterHotKey(NULL, (UINT)Cmd::MoveAway);
+	UnregisterHotKey(NULL, (UINT)Cmd::MoveBack);
+	UnregisterHotKey(NULL, (UINT)Cmd::MoveSwap);
+	UnregisterHotKey(NULL, (UINT)Cmd::RestoreTo);
+	UnregisterHotKey(NULL, (UINT)Cmd::PrevDesktop);
+	UnregisterHotKey(NULL, (UINT)Cmd::NextDesktop);
+	UnregisterHotKey(NULL, (UINT)Cmd::NextGroup);
+	UnregisterHotKey(NULL, (UINT)Cmd::PrevGroup);
+	UnregisterHotKey(NULL, (UINT)Cmd::NewGroup);
+	UnregisterHotKey(NULL, (UINT)Cmd::DeleteGroup);
+
+	RegisterHotKey(NULL, (UINT)Cmd::MoveAllAway, MOD_ALT | MOD_NOREPEAT, 'Q');
+	RegisterHotKey(NULL, (UINT)Cmd::MoveAway, MOD_ALT | MOD_NOREPEAT, 'X');
+	RegisterHotKey(NULL, (UINT)Cmd::MoveBack, MOD_ALT | MOD_NOREPEAT, 'Z');
+	RegisterHotKey(NULL, (UINT)Cmd::MoveSwap, MOD_ALT | MOD_NOREPEAT, 'P');
+	RegisterHotKey(NULL, (UINT)Cmd::RestoreTo, MOD_ALT | MOD_NOREPEAT, 'R');
+	RegisterHotKey(NULL, (UINT)Cmd::PrevDesktop, MOD_ALT | MOD_NOREPEAT, '3');
+	RegisterHotKey(NULL, (UINT)Cmd::NextDesktop, MOD_ALT | MOD_NOREPEAT, '4');
+	RegisterHotKey(NULL, (UINT)Cmd::NextGroup, MOD_ALT | MOD_NOREPEAT, '1');
+	RegisterHotKey(NULL, (UINT)Cmd::PrevGroup, MOD_ALT | MOD_NOREPEAT, '2');
+	RegisterHotKey(NULL, (UINT)Cmd::NewGroup, MOD_ALT | MOD_NOREPEAT, 'T');
+	RegisterHotKey(NULL, (UINT)Cmd::DeleteGroup, MOD_ALT | MOD_NOREPEAT, 'D');
+}
+
 int WINAPI WinMain(HINSTANCE _In_ hInstance, HINSTANCE _In_opt_ hPrev, LPSTR _In_ lpCmdLine, int _In_ nCmdShow)
 {
 	WNDCLASSEX wc;
@@ -677,16 +754,7 @@ int WINAPI WinMain(HINSTANCE _In_ hInstance, HINSTANCE _In_opt_ hPrev, LPSTR _In
 
 	scope_guard guard([]() {DestoryScratchDesktop();});
 
-	RegisterHotKey(NULL, (UINT)Cmd::MoveAway, MOD_ALT | MOD_NOREPEAT, 'X');
-	RegisterHotKey(NULL, (UINT)Cmd::MoveBack, MOD_ALT | MOD_NOREPEAT, 'Z');
-	RegisterHotKey(NULL, (UINT)Cmd::MoveSwap, MOD_ALT | MOD_NOREPEAT, 'P');
-	RegisterHotKey(NULL, (UINT)Cmd::RestoreTo, MOD_ALT | MOD_NOREPEAT, 'R');
-	RegisterHotKey(NULL, (UINT)Cmd::PrevDesktop, MOD_ALT | MOD_NOREPEAT, '1');
-	RegisterHotKey(NULL, (UINT)Cmd::NextDesktop, MOD_ALT | MOD_NOREPEAT, '2');
-	RegisterHotKey(NULL, (UINT)Cmd::NextGroup, MOD_ALT | MOD_NOREPEAT, 'G');
-	RegisterHotKey(NULL, (UINT)Cmd::PrevGroup, MOD_ALT | MOD_NOREPEAT, 'B');
-	RegisterHotKey(NULL, (UINT)Cmd::NewGroup, MOD_ALT | MOD_NOREPEAT, 'T');
-	RegisterHotKey(NULL, (UINT)Cmd::DeleteGroup, MOD_ALT | MOD_NOREPEAT, 'D');
+	BindHotKeys();
 
 	ShowWindow(hWnd, nCmdShow);
 
@@ -700,9 +768,13 @@ int WINAPI WinMain(HINSTANCE _In_ hInstance, HINSTANCE _In_opt_ hPrev, LPSTR _In
 				{
 					MoveToScratch(GetForegroundWindow(), TRUE);
 				} break;
+				case Cmd::MoveAllAway:
+				{
+					MoveAllToOther();
+				} break;
 				case Cmd::MoveBack:
 				{
-					MoveBackFromScratch();
+					MoveBackFromOther();
 				} break;
 				case Cmd::MoveSwap:
 				{
@@ -722,10 +794,12 @@ int WINAPI WinMain(HINSTANCE _In_ hInstance, HINSTANCE _In_opt_ hPrev, LPSTR _In
 				} break;
 				case Cmd::NextGroup:
 				{
+					SwitchToAnchorDesktop();
 					NextGroup();
 				} break;
 				case Cmd::PrevGroup:
 				{
+					SwitchToAnchorDesktop();
 					PrevGroup();
 				} break;
 				case Cmd::NewGroup:
