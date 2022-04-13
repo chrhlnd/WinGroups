@@ -9,10 +9,10 @@ Hotkeys can move windows off the current desktop and on to another such that the
  Current Hotkeys
 
     ALT+Q - Move all windows on this virtual desktop to another desktop.
-	ALT+X - Move the top widnow on this virutal deskto to another desktop.
-	ALT+Z - Move the last windows moved away back.
-	ALT+P - Swap all windows not on this desktop with all windows on this desktop.
-	ALT+R - Move all windows not on this desktop to this desktop
+	ALT+X - Move the top window on this virutal desktop to another desktop.
+	ALT+Z - Move the last window moved off this virt desktop, back to this virt desktop.
+	ALT+P - Swap all windows not on this virt desktop with all windows on this virt desktop.
+	ALT+R - Move all windows not on this virt desktop to this virt desktop
 	ALT+3 - Move virtual desktop previous (same as Win+Tab pick previous)
 	ALT+4 - Move virtual desktop next (same as Win+Tab pick next)
 	ALT+1 - WinGroup prev, all windows track into top group, move top group down one, move bottom of stack to top.
